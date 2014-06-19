@@ -8,12 +8,6 @@
 
 @implementation Odnoklassniki
 
-@synthesize appId = _appId;
-@synthesize session = _session;
-@synthesize delegate = _delegate;
-@synthesize appSecret = _appSecret;
-@synthesize appKey = _appKey;
-
 /**
 * Initializes Odnoklassniki object
 * @param anAppId application ID
@@ -42,7 +36,7 @@
 */
 - (void)authorize:(NSArray *)permissions {
 	[self.session close];
-	self.session = [[[OKSession alloc] initWithAppID:self.appId permissions:permissions appSecret:self.appSecret] autorelease];
+	self.session = [[OKSession alloc] initWithAppID:self.appId permissions:permissions appSecret:self.appSecret];
 	self.session.delegate = self.delegate;
 	self.session.appKey = self.appKey;
 	[OKSession setActiveSession:self.session];
@@ -66,8 +60,8 @@
 	[OKSession setActiveSession:nil];
 	self.session = nil;
 
-	if (_delegate && [_delegate respondsToSelector:@selector(okDidLogout)])
-		[_delegate okDidLogout];
+	if (self.delegate && [self.delegate respondsToSelector:@selector(okDidLogout)])
+		[self.delegate okDidLogout];
 }
 
 /**
@@ -100,12 +94,6 @@
 - (void)dealloc {
 	[self.session close];
 	[OKSession setActiveSession:nil];
-	self.session = nil;
-	[_appId release];
-	[_session release];
-	[_appSecret release];
-	[_appKey release];
-	[super dealloc];
 }
 
 @end

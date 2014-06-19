@@ -23,28 +23,17 @@ extern NSString* const kAPIBaseURL;
 -(void)okDidLogout;
 @end
 
-@interface OKSession : NSObject<OKRequestDelegate>{
-	NSString *_appId;
-	NSString *_appSecret;
-	NSString *_appKey;
-	NSArray *_permissions;
-	OKRequest *_tokenRequest;
-	OKRequest *_refreshTokenRequest;
+@interface OKSession : NSObject<OKRequestDelegate>
 
-	NSString *_accessToken;
-	NSString *_refreshToken;
-
-	id<OKSessionDelegate>_delegate;
-}
 @property(nonatomic, copy) NSString *appId;
-@property(nonatomic, retain) NSArray *permissions;
-@property(nonatomic, retain) OKRequest *tokenRequest;
+@property(nonatomic, strong) NSArray *permissions;
+@property(nonatomic, strong) OKRequest *tokenRequest;
 @property(nonatomic, copy) NSString *accessToken;
 @property(nonatomic, copy) NSString *refreshToken;
-@property(nonatomic, assign) id <OKSessionDelegate> delegate;
+@property(nonatomic, weak) id <OKSessionDelegate> delegate;
 @property(nonatomic, copy) NSString *appSecret;
 @property(nonatomic, copy) NSString *appKey;
-@property(nonatomic, retain) OKRequest *refreshTokenRequest;
+@property(nonatomic, strong) OKRequest *refreshTokenRequest;
 
 
 + (OKSession*)activeSession;

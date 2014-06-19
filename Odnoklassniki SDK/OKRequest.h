@@ -12,28 +12,18 @@ typedef enum{
 
 @protocol OKRequestDelegate;
 
-@interface OKRequest : NSObject{
-	id<OKRequestDelegate>	_delegate;
-	NSString *				_url;
-	NSString *				_httpMethod;
-	NSMutableDictionary *	_params;
-	NSError *				_error;
-	BOOL 					_sessionExpired;
-	BOOL					_hasError;
-	NSURLConnection*      	_connection;
-	NSMutableData*        	_responseText;
-}
+@interface OKRequest : NSObject
 
-@property(nonatomic, assign) id<OKRequestDelegate> delegate;
+@property(nonatomic, weak) id<OKRequestDelegate> delegate;
 @property(nonatomic, copy) NSString *url;
 @property(nonatomic, copy) NSString *httpMethod;
 
-@property(nonatomic, retain) NSMutableDictionary *params;
-@property(nonatomic, retain) NSError *error;
+@property(nonatomic, strong) NSMutableDictionary *params;
+@property(nonatomic, strong) NSError *error;
 @property(nonatomic, assign) BOOL sessionExpired;
 @property(nonatomic) BOOL hasError;
-@property(nonatomic, retain) NSURLConnection *connection;
-@property(nonatomic, retain) NSMutableData *responseText;
+@property(nonatomic, strong) NSURLConnection *connection;
+@property(nonatomic, strong) NSMutableData *responseText;
 
 
 + (NSString*)serializeURL:(NSString *)baseUrl

@@ -5,9 +5,8 @@
 
 
 #import "OKRequest.h"
-#import "OKUtils.h"
 #import "OKSession.h"
-#import "SBJson.h"
+#import "NSString+OKUtils.h"
 
 static const NSTimeInterval kRequestTimeoutInterval = 180.0;
 static NSString* kUserAgent = @"OdnoklassnikiIOs";
@@ -26,16 +25,6 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 @end
 
 @implementation OKRequest
-@synthesize delegate = _delegate;
-@synthesize url = _url;
-@synthesize httpMethod = _httpMethod;
-@synthesize params = _params;
-@synthesize error = _error;
-@synthesize sessionExpired = _sessionExpired;
-@synthesize hasError = _hasError;
-@synthesize connection = _connection;
-@synthesize responseText = _responseText;
-
 
 + (NSString*)serializeURL:(NSString *)baseUrl
 				   params:(NSDictionary *)params
@@ -45,15 +34,7 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 
 	NSMutableArray* pairs = [NSMutableArray array];
 	for (NSString* key in [params keyEnumerator]) {
-		NSString* escaped_value = (NSString *)CFURLCreateStringByAddingPercentEscapes(
-				NULL, /* allocator */
-				(CFStringRef)[params objectForKey:key],
-				NULL, /* charactersToLeaveUnescaped */
-				(CFStringRef)@"!*'();:@&=+$,/?%#[]",
-				kCFStringEncodingUTF8);
-
-		[pairs addObject:[NSString stringWithFormat:@"%@=%@", key, escaped_value]];
-		[escaped_value release];
+		[pairs addObject:[NSString stringWithFormat:@"%@=%@", key, [[params objectForKey:key]URLEncodedString]]];
 	}
 	NSString* query = [pairs componentsJoinedByString:@"&"];
 
@@ -73,15 +54,15 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 		[signatureString appendString:[NSString stringWithFormat:@"%@=%@", key, [params valueForKey:key]]];
 	}
 
-	[signatureString appendString:md5([NSString stringWithFormat:@"%@%@", accessToken, secret])];
-	return [md5(signatureString) lowercaseString];
+	[signatureString appendString:[[NSString stringWithFormat:@"%@%@", accessToken, secret]md5]];
+	return [[signatureString md5] lowercaseString];
 }
 
 + (OKRequest*)getRequestWithParams:(NSMutableDictionary *) params
 						httpMethod:(NSString *) httpMethod
 						  delegate:(id<OKRequestDelegate>)delegate
 						 apiMethod:(NSString *)apiMethod{
-	OKRequest *request = [[[OKRequest alloc] init] autorelease];
+	OKRequest *request = [[OKRequest alloc] init];
 	request.delegate = delegate;
 	request.params = params;
 
@@ -100,28 +81,21 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 }
 
 -(void)load {
-	self.responseText = [[[NSMutableData alloc] init] autorelease];
+	self.responseText = [[NSMutableData alloc] init];
 
 	NSURL *url = [NSURL URLWithString:self.url];
 	NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
 														   cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
 													   timeoutInterval:kRequestTimeoutInterval];
-	request.HTTPMethod = _httpMethod ? _httpMethod : @"GET";
+	request.HTTPMethod = self.httpMethod ? self.httpMethod : @"GET";
 	[request setValue:kUserAgent forHTTPHeaderField:@"User-Agent"];
-	self.connection = [[[NSURLConnection alloc] initWithRequest:request delegate:self] autorelease];
+	self.connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
 }
 
 - (void)handleResponse:(NSMutableData *)data {
 	id result;
-	Class jsonSerializationClass = NSClassFromString(@"NSJSONSerialization");
-	if (jsonSerializationClass) {
-		NSError *jsonParsingError = nil;
-		result = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonParsingError];
-	}else{
-		SBJsonParser *jsonParser = [[SBJsonParser alloc] init];
-		result = [jsonParser objectWithData:data];
-		[jsonParser release];
-	}
+    NSError *jsonParsingError = nil;
+    result = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonParsingError];
 	NSInteger error_code = [self checkResponseForErrorCodes:result];
 
 	if(error_code == PARAM_SESSION_EXPIRED){
@@ -133,13 +107,13 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 		return;
 	}
 
-	if (_delegate && [_delegate respondsToSelector:@selector(request:didLoad:)])
-		[_delegate request:self didLoad:result];
+	if (self.delegate && [self.delegate respondsToSelector:@selector(request:didLoad:)])
+		[self.delegate request:self didLoad:result];
 }
 
 -(void)failWithError:(NSError *)error{
-	if (_delegate && [_delegate respondsToSelector:@selector(request:didFailWithError:)])
-		[_delegate request:self didFailWithError:error];
+	if (self.delegate && [self.delegate respondsToSelector:@selector(request:didFailWithError:)])
+		[self.delegate request:self didFailWithError:error];
 }
 
 - (id)formatError:(NSInteger)code userInfo:(NSDictionary *) errorData {
@@ -162,22 +136,14 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 	return 0;
 }
 
-- (void)dealloc {
-	[_url release];
-	[_httpMethod release];
-	[_params release];
-	[_error release];
-	[_connection release];
-	[_responseText release];
-	[super dealloc];
-}
+
 
 /**
 * NSURLConnection Delegate
 */
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
-	[_responseText appendData:data];
+	[self.responseText appendData:data];
 }
 
 - (NSCachedURLResponse *)connection:(NSURLConnection *)connection
@@ -186,7 +152,7 @@ static NSString* kUserAgent = @"OdnoklassnikiIOs";
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
-	[self handleResponse:_responseText];
+	[self handleResponse:self.responseText];
 
 	self.responseText = nil;
 	self.connection = nil;

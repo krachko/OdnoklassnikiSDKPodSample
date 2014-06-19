@@ -5,8 +5,8 @@
 
 
 #import "OKSession.h"
-#import "OKUtils.h"
 #import "OKTokenCache.h"
+#import "NSString+OKUtils.h"
 
 NSString* const kLoginURL = @"http://www.odnoklassniki.ru/oauth/authorize";
 NSString* const kRedirectURL = @"odnoklassniki://";
@@ -26,37 +26,22 @@ static OKSession *_activeSession = nil;
 
 @implementation OKSession
 
-@synthesize appId = _appId;
-@synthesize permissions = _permissions;
-@synthesize tokenRequest = _tokenRequest;
-@synthesize accessToken = _accessToken;
-@synthesize refreshToken = _refreshToken;
-@synthesize delegate = _delegate;
-@synthesize appSecret = _appSecret;
-@synthesize appKey = _appKey;
-@synthesize refreshTokenRequest = _refreshTokenRequest;
-
-
 + (OKSession *)activeSession {
 	if (!_activeSession) {
 		OKSession *session = [[OKSession alloc] init];
 		[OKSession setActiveSession:session];
-		[session release];
 	}
-	return [[_activeSession retain] autorelease];
+	return _activeSession;
 }
 
 + (OKSession *)setActiveSession:(OKSession *)session {
 	if (!_activeSession){
-		_activeSession = [session retain];
+		_activeSession = session;
 	}else if (session != _activeSession) {
 		OKSession *toRelease = _activeSession;
 		[toRelease close];
-		_activeSession = [session retain];
-
-		if (toRelease) {
-			[toRelease release];
-		}
+        toRelease = nil;
+		_activeSession = session;
 	}
 
 	return session;
@@ -64,7 +49,7 @@ static OKSession *_activeSession = nil;
 
 + (BOOL)openActiveSessionWithPermissions:(NSArray *)permissions appId:(NSString *)appID appSecret:(NSString*)secret{
 	BOOL result = NO;
-	OKSession *session = [[[OKSession alloc] initWithAppID:appID permissions:permissions appSecret:secret] autorelease];
+	OKSession *session = [[OKSession alloc] initWithAppID:appID permissions:permissions appSecret:secret];
 	if (session.accessToken != nil) {
 		[self setActiveSession:session];
 		result = YES;
@@ -79,12 +64,12 @@ static OKSession *_activeSession = nil;
 	}
 
 	NSString *query = [url query];
-	NSDictionary *params = [OKUtils dictionaryByParsingURLQueryPart:query];
+	NSDictionary *params = [query dictionaryByParsingURLQueryPart];
 	if([params valueForKey:@"error"] != nil){
 		if ([[params valueForKey:@"error"] isEqualToString:@"access_denied"]){
 			[self didNotLogin:YES];
-		}else if (_delegate && [_delegate respondsToSelector:@selector(okDidNotLoginWithError:)])
-			[_delegate okDidNotLoginWithError:[NSError errorWithDomain:@"Odnoklassniki.ru" code:511 userInfo:params]];
+		}else if (self.delegate && [self.delegate respondsToSelector:@selector(okDidNotLoginWithError:)])
+			[self.delegate okDidNotLoginWithError:[NSError errorWithDomain:@"Odnoklassniki.ru" code:511 userInfo:params]];
 		return YES;
 	}
 
@@ -98,11 +83,11 @@ static OKSession *_activeSession = nil;
 	[newParams setValue:self.appId forKey:@"client_id"];
 	[newParams setValue:self.appSecret forKey:@"client_secret"];
 
-	self.tokenRequest = [[[OKRequest alloc] init] autorelease];
-	_tokenRequest.url = [OKRequest serializeURL:kAccessTokenURL params:newParams httpMethod:@"POST"];
-	_tokenRequest.delegate = self;
-	_tokenRequest.params = newParams;
-	_tokenRequest.httpMethod = @"POST";
+	self.tokenRequest = [[OKRequest alloc] init];
+	self.tokenRequest.url = [OKRequest serializeURL:kAccessTokenURL params:newParams httpMethod:@"POST"];
+	self.tokenRequest.delegate = self;
+	self.tokenRequest.params = newParams;
+	self.tokenRequest.httpMethod = @"POST";
 	[self.tokenRequest load];
 
 	return YES;
@@ -127,7 +112,7 @@ static OKSession *_activeSession = nil;
 			self.refreshToken = [NSString stringWithFormat:@"%@", [cachedToken valueForKey:kOKRefreshTokenKey]];
 			NSArray *aPermissions = [cachedToken valueForKey:kOKPermissionsKey];
 
-			if (_permissions == nil) self.permissions = aPermissions;
+			if (self.permissions == nil) self.permissions = aPermissions;
 
 			if (![self.permissions isEqualToArray:aPermissions]){
 				self.accessToken = nil;
@@ -141,22 +126,22 @@ static OKSession *_activeSession = nil;
 - (void)authorizeWithOKAppAuth:(BOOL)tryOKAppAuth
 					safariAuth:(BOOL)trySafariAuth {
 
-	if(_accessToken){
-		if (_delegate && [_delegate respondsToSelector:@selector(okDidLogin)])
-			[_delegate okDidLogin];
+	if(self.accessToken){
+		if (self.delegate && [self.delegate respondsToSelector:@selector(okDidLogin)])
+			[self.delegate okDidLogin];
 		return;
 	}
 
 	NSMutableDictionary* params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-			_appId, @"client_id",
+			self.appId, @"client_id",
 			[self getAppBaseUrl], @"redirect_uri",
 			@"code", @"response_type",
 			nil];
 
 	NSString *loginURL = kLoginURL;
 
-	if (_permissions){
-		NSString *scope = [_permissions componentsJoinedByString:@";"];
+	if (self.permissions){
+		NSString *scope = [self.permissions componentsJoinedByString:@";"];
 		[params setValue:scope forKey:@"scope"];
 	}
 
@@ -177,7 +162,7 @@ static OKSession *_activeSession = nil;
 
 - (NSString *)getAppBaseUrl {
 	return [NSString stringWithFormat:@"ok%@%@://authorize",
-									  _appId,
+									  self.appId,
 									  @""];
 }
 
@@ -188,11 +173,11 @@ static OKSession *_activeSession = nil;
 	[newParams setValue:self.appId forKey:@"client_id"];
 	[newParams setValue:self.appSecret forKey:@"client_secret"];
 
-	self.refreshTokenRequest = [[[OKRequest alloc] init] autorelease];
-	_refreshTokenRequest.url = [OKRequest serializeURL:kAccessTokenURL params:newParams httpMethod:@"POST"];
-	_refreshTokenRequest.delegate = self;
-	_refreshTokenRequest.params = newParams;
-	_refreshTokenRequest.httpMethod = @"POST";
+	self.refreshTokenRequest = [[OKRequest alloc] init];
+	self.refreshTokenRequest.url = [OKRequest serializeURL:kAccessTokenURL params:newParams httpMethod:@"POST"];
+	self.refreshTokenRequest.delegate = self;
+	self.refreshTokenRequest.params = newParams;
+	self.refreshTokenRequest.httpMethod = @"POST";
 	[self.refreshTokenRequest load];
 }
 
@@ -203,13 +188,13 @@ static OKSession *_activeSession = nil;
 }
 
 -(void)didNotLogin:(BOOL)canceled {
-	if (_delegate && [_delegate respondsToSelector:@selector(okDidNotLogin:)])
-		[_delegate okDidNotLogin:canceled];
+	if (self.delegate && [self.delegate respondsToSelector:@selector(okDidNotLogin:)])
+		[self.delegate okDidNotLogin:canceled];
 }
 
 -(void)didNotExtendToken:(NSError *)error {
-	if(_delegate && [_delegate respondsToSelector:@selector(okDidNotExtendToken:)])
-		[_delegate okDidNotExtendToken:error];
+	if(self.delegate && [self.delegate respondsToSelector:@selector(okDidNotExtendToken:)])
+		[self.delegate okDidNotExtendToken:error];
 }
 
 /*** OKAPIRequest delegate only for authorization ***/
@@ -223,8 +208,8 @@ static OKSession *_activeSession = nil;
 		self.accessToken = [(NSDictionary *)result valueForKey:kOKAccessTokenKey];
 		self.refreshToken = [(NSDictionary *)result valueForKey:kOKRefreshTokenKey];
 
-		if (_delegate && [_delegate respondsToSelector:@selector(okDidLogin)])
-			[_delegate okDidLogin];
+		if (self.delegate && [self.delegate respondsToSelector:@selector(okDidLogin)])
+			[self.delegate okDidLogin];
 
 	}else if(request == self.refreshTokenRequest){
 		if (self.refreshTokenRequest.hasError){
@@ -236,8 +221,8 @@ static OKSession *_activeSession = nil;
 		self.accessToken = [(NSDictionary *)result valueForKey:kOKAccessTokenKey];
 		[dct setValue:self.accessToken forKey:kOKAccessTokenKey];
 		[self cacheTokenCahceWithPermissions:dct];
-		if (_delegate && [_delegate respondsToSelector:@selector(okDidExtendToken:)])
-			[_delegate okDidExtendToken:self.accessToken];
+		if (self.delegate && [self.delegate respondsToSelector:@selector(okDidExtendToken:)])
+			[self.delegate okDidExtendToken:self.accessToken];
 	}
 }
 
@@ -251,20 +236,5 @@ static OKSession *_activeSession = nil;
 		[self didNotExtendToken:error];
 	}
 }
-
-- (void)dealloc {
-	[_appId release];
-	[_permissions release];
-	_tokenRequest.delegate = nil;
-	_refreshTokenRequest.delegate = nil;
-	[_accessToken release];
-	[_refreshToken release];
-	[_appSecret release];
-	[_appKey release];
-	[_tokenRequest release];
-	[_refreshTokenRequest release];
-	[super dealloc];
-}
-
 
 @end
